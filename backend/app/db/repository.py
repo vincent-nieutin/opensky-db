@@ -114,25 +114,27 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
         if not isinstance(values, list):
             values = [values]
 
-        if key.endswith("_gt"):
-            column = key[:-3]
-            conditions.append(f"{column} > ?")
-            params.append(value)
-            count_params.append(values[0])
-        elif key.endswith("_lt"):
-            column = key[:-3]
-            conditions.append(f"{column} < ?")
-            params.append(value)
-            count_params.append(values[0])
-        elif len(values) > 1:
+        if len(values) > 1:
             placeholders = ", ".join(["?"] * len(values))
             conditions.append(f"{key} IN ({placeholders})")
             params.extend(values)
             count_params.append(values[0])
         else:
-            conditions.append(f"{key} LIKE ?")
-            params.append(f"%{values[0]}%")
-            count_params.append(f"%{values[0]}%")
+            value = values[0]
+            if key.endswith("_gt"):
+                column = key[:-3]
+                conditions.append(f"{column} > ?")
+                params.append(value)
+                count_params.append(value)
+            elif key.endswith("_lt"):
+                column = key[:-3]
+                conditions.append(f"{column} < ?")
+                params.append(value)
+                count_params.append(value)
+            else:
+                conditions.append(f"{key} LIKE ?")
+                params.append(f"%{value}%")
+                count_params.append(f"%{value}%")
 
     # Cursor condition
     if cursor is not None:
