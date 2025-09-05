@@ -1,7 +1,7 @@
 __pycache__/
 env/
 
-db/
+/db/
 logs/
 
 .env
