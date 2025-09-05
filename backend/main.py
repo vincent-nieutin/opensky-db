@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.scheduler.jobs import start_scheduler, stop_scheduler
 from app.db.repository import init_db, query_flights
@@ -16,6 +17,14 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 app = FastAPI(lifespan=lifespan, title="OpenSky DB API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or restrict to your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def get_flights(
