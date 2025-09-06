@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from fastapi import WebSocket, WebSocketDisconnect
+import json, asyncio
+
 from app.scheduler.jobs import start_scheduler, stop_scheduler
 from app.routes.flights import router as flights_router
 from app.db.repository import init_db, query_flights
-from fastapi import APIRouter, Request, Query, WebSocket, WebSocketDisconnect
-import json, asyncio
+from app.core.logger import logger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,7 +35,8 @@ app.include_router(flights_router)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-
+    logger.info(f"WebSocket {websocket.client.host}:{websocket.client.port} connected")
+    
     filters = {}
     page_size = 50
     cursor = None
@@ -47,7 +50,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 filters = params.get("filters", {})
                 page_size = params.get("page_size", 50)
                 cursor = params.get("cursor", None)
-                print("Received params:", params)
 
                 data = query_flights(filters, page_size=page_size, cursor=cursor)
                 await websocket.send_json(data)
@@ -55,4 +57,4 @@ async def websocket_endpoint(websocket: WebSocket):
                 # No new message, continue with previous params
                 pass
     except WebSocketDisconnect:
-        print("WebSocket disconnected")
+        logger.info(f"WebSocket {websocket.client.host}:{websocket.client.port} disconnected")
