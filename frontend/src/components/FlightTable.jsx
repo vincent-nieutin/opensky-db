@@ -11,7 +11,7 @@ export default function FlightTable() {
     const [lastCursorSent, setLastCursorSent] = useState(null);
     const [filters, setFilters] = useState({});
 
-    const [unitSystem, setUnitSystem] = useState("metric");
+    const [unitSystem, setUnitSystem] = useState("imperial");
     const metersToFeet = (m) => m * 3.28084;
     const metersPerSecondToKnots = (mps) => mps * 1.94384;
 
@@ -25,13 +25,13 @@ export default function FlightTable() {
         { field: "latitude", headerName: "Latitude", flex: 1 },
         {
             field: "baro_altitude",
-            headerName: "Baro Altitude",
+            headerName: "Altitude",
             flex: 1,
             valueFormatter: (value) => {
                 if (value == null) return "-";
                 return unitSystem === "imperial"
-                    ? `${metersToFeet(value).toFixed(0)} ft`
-                    : `${value.toFixed(0)} m`
+                    ? `${Math.round(metersToFeet(value)).toLocaleString()} ft`
+                    : `${Math.round(value).toLocaleString()} m`
             }
         },
         {
@@ -56,8 +56,28 @@ export default function FlightTable() {
             field: "true_track",
             headerName: "True Track",
             flex: 1,
-            valueFormatter: (value) =>
-                value != null ? `${value.toFixed(0)}°` : "—"
+            renderCell: (params) => {
+                const value = params.value;
+                if (value === null) return "-";
+                
+                const angle = Math.round(value);
+                const arrowStyle = {
+                    display: "inline-block",
+                    transform: `rotate(${angle}deg)`,
+                    transition: "transfrom 0.2 ease",
+                    marginRight: "15px",
+                    fontSize: "25px"
+                };
+
+                return (
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                        <span style={arrowStyle}>↑</span>
+                        {`${angle.toLocaleString()}°`}
+                    </div>
+                )
+            }
+            // valueFormatter: (value) =>
+            //     value != null ? `${value.toFixed(0)}°` : "—"
         },
         {
             field: "vertical_rate",
@@ -66,8 +86,8 @@ export default function FlightTable() {
             valueFormatter: (value) => {
                 if (value == null) return "-";
                 return unitSystem === "imperial"
-                    ? `${metersPerSecondToKnots(value).toFixed(0)} ft/s`
-                    : `${value.toFixed(0)} m/s`
+                    ? `${metersPerSecondToKnots(value).toFixed(2)} ft/s`
+                    : `${value.toFixed(2)} m/s`
             }
         },
         // {
@@ -162,109 +182,102 @@ export default function FlightTable() {
 
     return (
         <div style={{ height: "90vh", width: "100%" }}>
-            <div style={{ marginBottom: 16, display: "flex", gap: "12px", alignItems: "center" }}>
-                <input
-                    type="text"
-                    placeholder="Search ICAO24"
-                    onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters((prev) => ({
-                            ...prev,
-                            icao24: value || undefined,
-                        }));
-                        setCursorMap({ 0: null });
-                        setPage(0);
-                    }}
-                    style={{ padding: 8, width: 200 }}
-                />
-                <input
-                    type="text"
-                    placeholder="Search callsign"
-                    onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters((prev) => ({
-                            ...prev,
-                            callsign: value || undefined,
-                        }));
-                        setCursorMap({ 0: null });
-                        setPage(0);
-                    }}
-                    style={{ padding: 8, width: 200 }}
-                />
-                <input
-                    type="text"
-                    placeholder="Search Country"
-                    onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters((prev) => ({
-                            ...prev,
-                            origin_country: value || undefined,
-                        }));
-                        setCursorMap({ 0: null });
-                        setPage(0);
-                    }}
-                    style={{ padding: 8, width: 200 }}
-                />
-                <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    On Ground:
-                    <select
+            <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    <input
+                        type="text"
+                        placeholder="Search ICAO24"
                         onChange={(e) => {
                             const value = e.target.value;
                             setFilters((prev) => ({
                                 ...prev,
-                                on_ground:
-                                    value === "any" ? undefined : value === "yes" ? 1 : 0
+                                icao24: value || undefined,
                             }));
                             setCursorMap({ 0: null });
                             setPage(0);
                         }}
-                        style={{
-                            padding: "8px",
-                            borderRadius: "4px",
-                            border: "1px solid #ccc",
-                            backgroundColor: "#fff"
+                        style={{ padding: 8, width: 200 }}
+                    />
+                    <input
+                        type="text"
+                        placeholder="Search callsign"
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setFilters((prev) => ({
+                                ...prev,
+                                callsign: value || undefined,
+                            }));
+                            setCursorMap({ 0: null });
+                            setPage(0);
                         }}
-                        defaultValue="any"
-                    >
-                        <option value="any">Any</option>
-                        <option value="yes">Yes</option>
-                        <option value="no">No</option>
-                    </select>
-                </label>
-                <FormControlLabel
-                    control={
-                        <Switch
+                        style={{ padding: 8, width: 200 }}
+                    />
+                    <input
+                        type="text"
+                        placeholder="Search Country"
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setFilters((prev) => ({
+                                ...prev,
+                                origin_country: value || undefined,
+                            }));
+                            setCursorMap({ 0: null });
+                            setPage(0);
+                        }}
+                        style={{ padding: 8, width: 200 }}
+                    />
+                    <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        On Ground:
+                        <select
                             onChange={(e) => {
-                                const checked = e.target.checked;
+                                const value = e.target.value;
                                 setFilters((prev) => ({
                                     ...prev,
-                                    squawk: checked ? ["7500", "7600", "7700"] : undefined,
+                                    on_ground:
+                                        value === "any" ? undefined : value === "yes" ? 1 : 0
                                 }));
                                 setCursorMap({ 0: null });
                                 setPage(0);
                             }}
-                        />
-                    }
-                    label="Emergencies"
-                />
-                <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    Units:
-                    <select
-                        defaultValue="metric"
+                            style={{
+                                padding: "8px",
+                                borderRadius: "4px",
+                                border: "1px solid #ccc",
+                                backgroundColor: "#fff"
+                            }}
+                            defaultValue="any"
+                        >
+                            <option value="any">Any</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                        </select>
+                    </label>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setFilters((prev) => ({
+                                        ...prev,
+                                        squawk: checked ? ["7500", "7600", "7700"] : undefined,
+                                    }));
+                                    setCursorMap({ 0: null });
+                                    setPage(0);
+                                }}
+                            />
+                        }
+                        label="Emergencies"
+                    />
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span>Metric</span>
+                    <Switch
+                        checked={unitSystem === "imperial"}
                         onChange={(e) => {
-                            const value = e.target.value;
-                            setUnitSystem(value); // new state
+                            setUnitSystem(e.target.checked ? "imperial" : "metric"); // new state
                         }}
-                        style={{
-                            padding: "8px",
-                            borderRadius: "4px",
-                            border: "1px solid #ccc",
-                            backgroundColor: "#fff"
-                        }}
-                    >
-                        <option value="metric">Metric</option>
-                        <option value="imperial">Imperial</option>
-                    </select>
+                    />
+                    <span>Imperial</span>
                 </label>
             </div>
             <DataGrid
