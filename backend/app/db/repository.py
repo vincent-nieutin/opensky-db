@@ -91,7 +91,7 @@ def remove_expired_flights():
     conn.close()
     logger.info(f"Successfully removed {cursor.rowcount} records")
 
-def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
+def query_flights(filters: dict, page_size: int = 50, cursor: int = None, sort_field: str = "id", sort_order: str = "acs"):
     conn = get_db()
     conn.row_factory = sqlite3.Row
     cursor_obj = conn.cursor()
@@ -137,18 +137,22 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
     if cursor is not None:
         conditions.append("id > ?")
         params.append(cursor)
-
+        count_conditions.append("id > ?")
+        count_params.append(cursor)
+    
+    where_clause = " WHERE " + fixed_condition
     if conditions:
-        base_query += " WHERE " + fixed_condition + " AND " + " AND ".join(conditions)
-    else:
-        base_query += " WHERE " + fixed_condition
+        where_clause += " AND " + " AND ".join(conditions)
 
-    if count_conditions:
-        count_query += " WHERE " + fixed_condition + " AND " + " AND ".join(count_conditions)
-    else:
-        count_query += " WHERE " + fixed_condition
+    base_query += where_clause
+    count_query += where_clause
 
-    base_query += " ORDER BY id ASC LIMIT ?"
+    if sort_field:
+        base_query += f" ORDER BY {sort_field} {sort_order.upper()}"
+    else:
+        base_query += " ORDER BY id ASC"
+
+    base_query += " LIMIT ?"
     params.append(page_size)
 
     # Execute count query

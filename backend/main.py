@@ -51,11 +51,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 filters = params.get("filters", {})
                 page_size = params.get("page_size", 50)
                 cursor = params.get("cursor", None)
+                sort_field = params.get("sort_field", None)
+                sort_order = params.get("sort_order", None)
 
-                data = query_flights(filters, page_size=page_size, cursor=cursor)
+                data = query_flights(filters, page_size=page_size, cursor=cursor, sort_field=sort_field, sort_order=sort_order)
                 await websocket.send_json(data)
             except asyncio.TimeoutError:
-                data = query_flights(filters, page_size=page_size, cursor=cursor)
+                data = query_flights(filters, page_size=page_size, cursor=cursor, sort_field=sort_field, sort_order=sort_order)
                 await websocket.send_json(data)
 
     except WebSocketDisconnect:

@@ -11,6 +11,7 @@ export default function FlightTable() {
     const [lastCursorSent, setLastCursorSent] = useState(null);
     const [filters, setFilters] = useState({});
     const [pageSize, setPageSize] = useState(50);
+    const [sortModel, setSortModel] = useState([]);
 
     const [unitSystem, setUnitSystem] = useState("imperial");
     const metersToFeet = (m) => m * 3.28084;
@@ -105,14 +106,17 @@ export default function FlightTable() {
 
     const socketRef = useRef(null);
 
-    const sendPageRequest = (cursor, size = pageSize) => {
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
+    const sendPageRequest = (cursor, size = pageSize, model = sortModel) => {
+        const sort = model[0] || {};
 
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(
                 JSON.stringify({
                     filters: filters,
                     page_size: size,
                     cursor: cursor,
+                    sort_field: sort.field,
+                    sort_order: sort.sort
                 })
             );
             setLoading(true);
@@ -182,6 +186,14 @@ export default function FlightTable() {
         const cursor = cursorMap[newPage] ?? lastCursorSent ?? null;
         setPage(newPage);
         sendPageRequest(cursor, newPageSize);
+    };
+
+
+    const handleSortChange = (model) => {
+        setSortModel(model);
+        setCursorMap({ 0: null });
+        setPage(0);
+        sendPageRequest(null, pageSize, model)
     };
 
     return (
@@ -296,13 +308,15 @@ export default function FlightTable() {
                     columns={columns}
                     getRowId={(row) => row.id}
                     loading={loading}
+                    sortingMode="server"
+                    onSortModelChange={handleSortChange}
                     pagination
                     paginationMode="server"
+                    onPaginationModelChange={handlePageChange}
                     rowCount={rowCount}
                     pageSize={pageSize}
                     pageSizeOptions={[5, 10, 25, 50, 100]}
                     page={page}
-                    onPaginationModelChange={handlePageChange}
                     initialState={{
                         pagination: {
                             paginationModel: {
