@@ -10,6 +10,7 @@ export default function FlightTable() {
     const [cursorMap, setCursorMap] = useState({ 0: null });
     const [lastCursorSent, setLastCursorSent] = useState(null);
     const [filters, setFilters] = useState({});
+    const [pageSize, setPageSize] = useState(50);
 
     const [unitSystem, setUnitSystem] = useState("imperial");
     const metersToFeet = (m) => m * 3.28084;
@@ -59,7 +60,7 @@ export default function FlightTable() {
             renderCell: (params) => {
                 const value = params.value;
                 if (value === null) return "-";
-                
+
                 const angle = Math.round(value);
                 const arrowStyle = {
                     display: "inline-block",
@@ -104,12 +105,13 @@ export default function FlightTable() {
 
     const socketRef = useRef(null);
 
-    const sendPageRequest = (cursor) => {
+    const sendPageRequest = (cursor, size = pageSize) => {
         if (socketRef.current?.readyState === WebSocket.OPEN) {
+
             socketRef.current.send(
                 JSON.stringify({
                     filters: filters,
-                    page_size: 50,
+                    page_size: size,
                     cursor: cursor,
                 })
             );
@@ -129,7 +131,7 @@ export default function FlightTable() {
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            
+
             if (data.error) {
                 console.error("Server error:", data.error);
                 setLoading(false);
@@ -173,16 +175,18 @@ export default function FlightTable() {
     }, [filters]);
 
     const handlePageChange = (model) => {
-        const newPage = model.page
+        const newPage = model.page;
+        const newPageSize = model.pageSize;
 
+        setPageSize(newPageSize);
         const cursor = cursorMap[newPage] ?? lastCursorSent ?? null;
         setPage(newPage);
-        sendPageRequest(cursor);
+        sendPageRequest(cursor, newPageSize);
     };
 
     return (
-        <div style={{ height: "90vh", width: "100%" }}>
-            <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+        <div>
+            <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                     <input
                         type="text"
@@ -280,39 +284,41 @@ export default function FlightTable() {
                     <span>Imperial</span>
                 </label>
             </div>
-            <DataGrid
-                sx={{
-                    "& .MuiDataGrid-row:hover": {
-                        backgroundColor: "#f0f8ff",
-                        cursor: "pointer"
-                    }
-                }}
-                rows={rows}
-                columns={columns}
-                getRowId={(row) => row.id}
-                loading={loading}
-                pagination
-                paginationMode="server"
-                rowCount={rowCount}
-                pageSize={50}
-                pageSizeOptions={[50]}
-                page={page}
-                initialState={{
-                    pagination: {
-                        paginationModel: {
-                            pageSize: 50,
-                            page: 0
+            <div style={{ height: "calc(100vh - 94px)", width: "100%" }}>
+                <DataGrid
+                    sx={{
+                        "& .MuiDataGrid-row:hover": {
+                            backgroundColor: "#f0f8ff",
+                            cursor: "pointer"
                         }
-                    }
-                }}
-                onPaginationModelChange={handlePageChange}
-                onRowClick={(params) => {
-                    const icao = params.row.icao24;
-                    if (icao) {
-                        window.open(`https://globe.adsbexchange.com/?icao=${icao}`, "_blank");
-                    }
-                }}
-            />
+                    }}
+                    rows={rows}
+                    columns={columns}
+                    getRowId={(row) => row.id}
+                    loading={loading}
+                    pagination
+                    paginationMode="server"
+                    rowCount={rowCount}
+                    pageSize={pageSize}
+                    pageSizeOptions={[5, 10, 25, 50, 100]}
+                    page={page}
+                    onPaginationModelChange={handlePageChange}
+                    initialState={{
+                        pagination: {
+                            paginationModel: {
+                                pageSize: pageSize,
+                                page: 0
+                            }
+                        }
+                    }}
+                    onRowClick={(params) => {
+                        const icao = params.row.icao24;
+                        if (icao) {
+                            window.open(`https://globe.adsbexchange.com/?icao=${icao}`, "_blank");
+                        }
+                    }}
+                />
+            </div>
         </div>
     );
 }
