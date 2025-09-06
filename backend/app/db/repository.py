@@ -91,14 +91,6 @@ def remove_expired_flights():
     conn.close()
     logger.info(f"Successfully removed {cursor.rowcount} records")
 
-def get_latest_fetch_time():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT MAX(timestamp) FROM flight_data")
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else None
-
 def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
     conn = get_db()
     conn.row_factory = sqlite3.Row
@@ -106,6 +98,7 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
 
     base_query = "SELECT * FROM flight_data"
     count_query = "SELECT COUNT(*) FROM flight_data"
+    fixed_condition = "latitude IS NOT NULL AND longitude IS NOT NULL"
     conditions = []
     params = []
     count_params = []
@@ -146,10 +139,14 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
         params.append(cursor)
 
     if conditions:
-        base_query += " WHERE " + " AND ".join(conditions)
+        base_query += " WHERE " + fixed_condition + " AND " + " AND ".join(conditions)
+    else:
+        base_query += " WHERE " + fixed_condition
 
     if count_conditions:
-        count_query += " WHERE " + " AND ".join(count_conditions)
+        count_query += " WHERE " + fixed_condition + " AND " + " AND ".join(count_conditions)
+    else:
+        count_query += " WHERE " + fixed_condition
 
     base_query += " ORDER BY id ASC LIMIT ?"
     params.append(page_size)
