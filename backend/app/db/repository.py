@@ -109,10 +109,37 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
     conditions = []
     params = []
     count_params = []
+    count_conditions = []
+    print("Filters:", filters)
 
-    for key, values in filters.items():
-        if not isinstance(values, list):
-            values = [values]
+    for key, raw_values in filters.items():
+        values = raw_values if isinstance(raw_values, list) else [raw_values]
+
+        if len(values) > 1:
+            placeholders = ", ".join(["?"] * len(values))
+            conditions.append(f"{key} IN ({placeholders})")
+            params.extend(values)
+            count_conditions.append(f"{key} IN ({placeholders})")
+            count_params.extend(values)
+        else:
+            value = values[0]
+            if key.endswith("_gt"):
+                column = key[:-3]
+                conditions.append(f"{column} > ?")
+                params.append(value)
+                count_conditions.append(f"{column} > ?")
+                count_params.append(value)
+            elif key.endswith("_lt"):
+                column = key[:-3]
+                conditions.append(f"{column} < ?")
+                params.append(value)
+                count_conditions.append(f"{column} < ?")
+                count_params.append(value)
+            else:
+                conditions.append(f"{key} LIKE ?")
+                params.append(f"%{value}%")
+                count_conditions.append(f"{key} LIKE ?")
+                count_params.append(f"%{value}%")
 
     # Cursor condition
     if cursor is not None:
@@ -122,34 +149,8 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
     if conditions:
         base_query += " WHERE " + " AND ".join(conditions)
 
-        # Build count_conditions and count_params separately
-        count_conditions = []
-        count_params = []
-
-        for key, values in filters.items():
-            if not isinstance(values, list):
-                values = [values]
-
-            if len(values) > 1:
-                placeholders = ", ".join(["?"] * len(values))
-                count_conditions.append(f"{key} IN ({placeholders})")
-                count_params.extend(values)
-            else:
-                value = values[0]
-                if key.endswith("_gt"):
-                    column = key[:-3]
-                    count_conditions.append(f"{column} > ?")
-                    count_params.append(value)
-                elif key.endswith("_lt"):
-                    column = key[:-3]
-                    count_conditions.append(f"{column} < ?")
-                    count_params.append(value)
-                else:
-                    count_conditions.append(f"{key} LIKE ?")
-                    count_params.append(f"%{value}%")
-
-        if count_conditions:
-            count_query += " WHERE " + " AND ".join(count_conditions)
+    if count_conditions:
+        count_query += " WHERE " + " AND ".join(count_conditions)
 
     base_query += " ORDER BY id ASC LIMIT ?"
     params.append(page_size)
@@ -159,6 +160,7 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
     results_count = cursor_obj.fetchone()[0]
     
     # Execute data query
+    print("Executing query:", base_query, "with params:", params)
     cursor_obj.execute(base_query, params)
     results = [dict(row) for row in cursor_obj.fetchall()]
     conn.close()
