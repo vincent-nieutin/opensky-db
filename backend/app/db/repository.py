@@ -110,7 +110,6 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
     params = []
     count_params = []
     count_conditions = []
-    print("Filters:", filters)
 
     for key, raw_values in filters.items():
         values = raw_values if isinstance(raw_values, list) else [raw_values]
@@ -160,7 +159,6 @@ def query_flights(filters: dict, page_size: int = 50, cursor: int = None):
     results_count = cursor_obj.fetchone()[0]
     
     # Execute data query
-    print("Executing query:", base_query, "with params:", params)
     cursor_obj.execute(base_query, params)
     results = [dict(row) for row in cursor_obj.fetchall()]
     conn.close()
