@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Query
+from fastapi import APIRouter, Request, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from app.db.repository import query_flights
 
@@ -48,10 +48,3 @@ def get_available_parameters():
 @router.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse("static/favicon.ico")
-
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     while True:
-#         await websocket.send_json(get_latest_data())
-#         await asyncio.sleep(10)
