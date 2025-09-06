@@ -27,6 +27,7 @@ export default function FlightTable() {
     const [rowCount, setRowCount] = useState(0);
     const [cursorMap, setCursorMap] = useState({ 0: null });
     const [lastCursorSent, setLastCursorSent] = useState(null);
+    const [filters, setFilters] = useState({});
 
     const socketRef = useRef(null);
 
@@ -34,7 +35,7 @@ export default function FlightTable() {
         if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(
                 JSON.stringify({
-                    filters: {},
+                    filters: filters,
                     page_size: 50,
                     cursor: cursor,
                 })
@@ -95,6 +96,10 @@ export default function FlightTable() {
         };
     }, []);
 
+    useEffect(() => {
+        sendPageRequest(null); // restart from beginning with new filters
+    }, [filters]);
+
     const handlePageChange = (model) => {
         const newPage = model.page
         console.log("Page changed to:", newPage);
@@ -106,6 +111,19 @@ export default function FlightTable() {
 
     return (
         <div style={{ height: 600, width: "100%" }}>
+            <div style={{ marginBottom: 16 }}>
+                <input
+                    type="text"
+                    placeholder="Search callsign"
+                    onChange={(e) => {
+                        const value = e.target.value;
+                        setFilters(value ? { callsign: value } : {});
+                        setCursorMap({ 0: null }); // reset pagination
+                        setPage(0);
+                    }}
+                    style={{ padding: 8, width: 200 }}
+                />
+            </div>
             <DataGrid
                 rows={rows}
                 columns={columns}
@@ -117,6 +135,14 @@ export default function FlightTable() {
                 pageSize={50}
                 pageSizeOptions={[50]}
                 page={page}
+                initialState={{
+                    pagination: {
+                        paginationModel: {
+                            pageSize: 50,
+                            page: 0
+                        }
+                    }
+                }}
                 onPaginationModelChange={handlePageChange}
             />
         </div>
