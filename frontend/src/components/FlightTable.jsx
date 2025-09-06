@@ -2,25 +2,6 @@ import React, { useEffect, useState, useRef } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { Switch, FormControlLabel } from "@mui/material";
 
-const columns = [
-    { field: "icao24", "headerName": "ICAO24", flex: 1 },
-    { field: "callsign", headerName: "Callsign", flex: 1 },
-    { field: "origin_country", headerName: "Country", flex: 1 },
-    { field: "time_position", headerName: "Time Position", flex: 1 },
-    { field: "last_contact", headerName: "Last Contact", flex: 1 },
-    { field: "longitude", headerName: "Longitude", flex: 1 },
-    { field: "latitude", headerName: "Latitude", flex: 1 },
-    { field: "baro_altitude", headerName: "Baro Altitude", flex: 1 },
-    { field: "on_ground", headerName: "On Ground", flex: 1 },
-    { field: "velocity", headerName: "Velocity", flex: 1 },
-    { field: "true_track", headerName: "True Track", flex: 1 },
-    { field: "vertical_rate", headerName: "Vertical Rate", flex: 1 },
-    { field: "geo_altitude", headerName: "Geo Altitude", flex: 1 },
-    { field: "squawk", headerName: "Squawk", flex: 1 },
-    { field: "position_source", headerName: "Position Source", flex: 1 },
-    { field: "category", headerName: "Category", flex: 1 }
-];
-
 export default function FlightTable() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -29,6 +10,77 @@ export default function FlightTable() {
     const [cursorMap, setCursorMap] = useState({ 0: null });
     const [lastCursorSent, setLastCursorSent] = useState(null);
     const [filters, setFilters] = useState({});
+
+    const [unitSystem, setUnitSystem] = useState("metric");
+    const metersToFeet = (m) => m * 3.28084;
+    const metersPerSecondToKnots = (mps) => mps * 1.94384;
+
+    const columns = [
+        { field: "icao24", "headerName": "ICAO24", flex: 1 },
+        { field: "callsign", headerName: "Callsign", flex: 1 },
+        { field: "origin_country", headerName: "Country", flex: 1 },
+        // { field: "time_position", headerName: "Time Position", flex: 1 },
+        // { field: "last_contact", headerName: "Last Contact", flex: 1 },
+        { field: "longitude", headerName: "Longitude", flex: 1 },
+        { field: "latitude", headerName: "Latitude", flex: 1 },
+        {
+            field: "baro_altitude",
+            headerName: "Baro Altitude",
+            flex: 1,
+            valueFormatter: (value) => {
+                if (value == null) return "-";
+                return unitSystem === "imperial"
+                    ? `${metersToFeet(value).toFixed(0)} ft`
+                    : `${value.toFixed(0)} m`
+            }
+        },
+        {
+            field: "on_ground",
+            headerName: "On Ground",
+            flex: 1,
+            valueFormatter: (value) =>
+                value == 1 ? "Yes" : value === 0 ? "No" : "-"
+        },
+        {
+            field: "velocity",
+            headerName: "Velocity",
+            flex: 1,
+            valueFormatter: (value) => {
+                if (value == null) return "-";
+                return unitSystem === "imperial"
+                    ? `${metersPerSecondToKnots(value).toFixed(1)} kts`
+                    : `${value.toFixed(1)} m/s`
+            }
+        },
+        {
+            field: "true_track",
+            headerName: "True Track",
+            flex: 1,
+            valueFormatter: (value) =>
+                value != null ? `${value.toFixed(0)}°` : "—"
+        },
+        {
+            field: "vertical_rate",
+            headerName: "Vertical Rate",
+            flex: 1,
+            valueFormatter: (value) => {
+                if (value == null) return "-";
+                return unitSystem === "imperial"
+                    ? `${metersPerSecondToKnots(value).toFixed(0)} ft/s`
+                    : `${value.toFixed(0)} m/s`
+            }
+        },
+        // {
+        //     field: "geo_altitude",
+        //     headerName: "Geo Altitude",
+        //     flex: 1,
+        //     valueFormatter: (value) =>
+        //         value != null ? `${value.toFixed(0)} m` : "—"
+        // },
+        { field: "squawk", headerName: "Squawk", flex: 1 },
+        // { field: "position_source", headerName: "Position Source", flex: 1 },
+        // { field: "category", headerName: "Category", flex: 1 }
+    ];
 
     const socketRef = useRef(null);
 
@@ -109,7 +161,7 @@ export default function FlightTable() {
     };
 
     return (
-        <div style={{ height: 600, width: "100%" }}>
+        <div style={{ height: "90vh", width: "100%" }}>
             <div style={{ marginBottom: 16, display: "flex", gap: "12px", alignItems: "center" }}>
                 <input
                     type="text"
@@ -195,6 +247,25 @@ export default function FlightTable() {
                     }
                     label="Emergencies"
                 />
+                <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    Units:
+                    <select
+                        defaultValue="metric"
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setUnitSystem(value); // new state
+                        }}
+                        style={{
+                            padding: "8px",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc",
+                            backgroundColor: "#fff"
+                        }}
+                    >
+                        <option value="metric">Metric</option>
+                        <option value="imperial">Imperial</option>
+                    </select>
+                </label>
             </div>
             <DataGrid
                 sx={{
