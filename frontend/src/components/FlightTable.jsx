@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { DataGrid } from "@mui/x-data-grid";
+import { Switch, FormControlLabel } from "@mui/material";
 
 const columns = [
     { field: "icao24", "headerName": "ICAO24", flex: 1 },
@@ -56,7 +57,6 @@ export default function FlightTable() {
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            console.log("Received data:", data);
 
             if (data.error) {
                 console.error("Server error:", data.error);
@@ -102,7 +102,6 @@ export default function FlightTable() {
 
     const handlePageChange = (model) => {
         const newPage = model.page
-        console.log("Page changed to:", newPage);
 
         const cursor = cursorMap[newPage] ?? lastCursorSent ?? null;
         setPage(newPage);
@@ -111,20 +110,99 @@ export default function FlightTable() {
 
     return (
         <div style={{ height: 600, width: "100%" }}>
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 16, display: "flex", gap: "12px", alignItems: "center" }}>
+                <input
+                    type="text"
+                    placeholder="Search ICAO24"
+                    onChange={(e) => {
+                        const value = e.target.value;
+                        setFilters((prev) => ({
+                            ...prev,
+                            icao24: value || undefined,
+                        }));
+                        setCursorMap({ 0: null });
+                        setPage(0);
+                    }}
+                    style={{ padding: 8, width: 200 }}
+                />
                 <input
                     type="text"
                     placeholder="Search callsign"
                     onChange={(e) => {
                         const value = e.target.value;
-                        setFilters(value ? { callsign: value } : {});
-                        setCursorMap({ 0: null }); // reset pagination
+                        setFilters((prev) => ({
+                            ...prev,
+                            callsign: value || undefined,
+                        }));
+                        setCursorMap({ 0: null });
                         setPage(0);
                     }}
                     style={{ padding: 8, width: 200 }}
                 />
+                <input
+                    type="text"
+                    placeholder="Search Country"
+                    onChange={(e) => {
+                        const value = e.target.value;
+                        setFilters((prev) => ({
+                            ...prev,
+                            origin_country: value || undefined,
+                        }));
+                        setCursorMap({ 0: null });
+                        setPage(0);
+                    }}
+                    style={{ padding: 8, width: 200 }}
+                />
+                <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    On Ground:
+                    <select
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setFilters((prev) => ({
+                                ...prev,
+                                on_ground:
+                                    value === "any" ? undefined : value === "yes" ? 1 : 0
+                            }));
+                            setCursorMap({ 0: null });
+                            setPage(0);
+                        }}
+                        style={{
+                            padding: "8px",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc",
+                            backgroundColor: "#fff"
+                        }}
+                        defaultValue="any"
+                    >
+                        <option value="any">Any</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                    </select>
+                </label>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            onChange={(e) => {
+                                const checked = e.target.checked;
+                                setFilters((prev) => ({
+                                    ...prev,
+                                    squawk: checked ? ["7500", "7600", "7700"] : undefined,
+                                }));
+                                setCursorMap({ 0: null });
+                                setPage(0);
+                            }}
+                        />
+                    }
+                    label="Emergencies"
+                />
             </div>
             <DataGrid
+                sx={{
+                    "& .MuiDataGrid-row:hover": {
+                        backgroundColor: "#f0f8ff",
+                        cursor: "pointer"
+                    }
+                }}
                 rows={rows}
                 columns={columns}
                 getRowId={(row) => row.id}
@@ -144,6 +222,12 @@ export default function FlightTable() {
                     }
                 }}
                 onPaginationModelChange={handlePageChange}
+                onRowClick={(params) => {
+                    const icao = params.row.icao24;
+                    if (icao) {
+                        window.open(`https://globe.adsbexchange.com/?icao=${icao}`, "_blank");
+                    }
+                }}
             />
         </div>
     );
