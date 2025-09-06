@@ -1,5 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from app.services.flight_service import fetch_and_store_flights, cleanup_flights
 from datetime import datetime
 import os
@@ -13,14 +13,14 @@ def start_scheduler():
     logger.info(f"Starting fetch_and_store_flights scheduler with interval {fetch_interval} seconds")
     scheduler.add_job(
         fetch_and_store_flights,
-        trigger=CronTrigger(second=f"*/{fetch_interval}")
+        trigger=IntervalTrigger(seconds=fetch_interval)
     )
 
     cleanup_interval = int(SCHEDULER_CLEANUP_INTERVAL_MINUTES)
     logger.info(f"Starting cleanup_flights scheduler with interval {cleanup_interval} minutes")
     scheduler.add_job(
         cleanup_flights,
-        trigger=CronTrigger(minute=f"*/{cleanup_interval}")
+        trigger=IntervalTrigger(minutes=cleanup_interval)
     )
 
     scheduler.start()

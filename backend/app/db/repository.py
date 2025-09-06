@@ -1,5 +1,5 @@
 import sqlite3, time, os
-from app.core.config import DB_PATH, DB_RECORD_EXPIRY_MINUTES
+from app.core.config import DB_PATH, DB_RECORD_EXPIRY_SECONDS
 from app.core.logger import logger
 
 def get_db():
@@ -81,12 +81,12 @@ def upsert_flight_data(states):
 
     return inserted, updated
 
-def cleanup_expired_flights():
+def remove_expired_flights():
     logger.info("Cleaning up expired flight data")
     conn = get_db()
     cursor = conn.cursor()
-    cutoff = int(time.time()) - int(DB_RECORD_EXPIRY_MINUTES) * 60
-    cursor.execute("DELETE FROM flight_data WHERE timestamp < ?", (cutoff,))
+    threshold = int(time.time()) - int(DB_RECORD_EXPIRY_SECONDS)
+    cursor.execute("DELETE FROM flight_data WHERE timestamp < ?", (threshold,))
     conn.commit()
     conn.close()
     logger.info(f"Successfully removed {cursor.rowcount} records")

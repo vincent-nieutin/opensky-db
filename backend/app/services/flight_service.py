@@ -15,8 +15,8 @@ def fetch_and_store_flights():
 
 def cleanup_flights():
     try:
-        from app.db.repository import cleanup_expired_flights
-        cleanup_expired_flights()
+        from app.db.repository import remove_expired_flights
+        remove_expired_flights()
     except Exception as e:
         logger.error(f"Failed to clean up flights: {e}")
 
