@@ -8,6 +8,7 @@ from app.scheduler.jobs import start_scheduler, stop_scheduler
 from app.routes.flights import router as flights_router
 from app.db.repository import init_db, query_flights
 from app.core.logger import logger
+from app.core.config import SCHEDULER_FETCH_INTERVAL_SECONDS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,7 +46,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             try:
                 # Wait for new message for up to 10 seconds
-                message = await asyncio.wait_for(websocket.receive_text(), timeout=10)
+                message = await asyncio.wait_for(websocket.receive_text(), timeout=SCHEDULER_FETCH_INTERVAL_SECONDS)
                 params = json.loads(message)
                 filters = params.get("filters", {})
                 page_size = params.get("page_size", 50)
@@ -54,7 +55,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 data = query_flights(filters, page_size=page_size, cursor=cursor)
                 await websocket.send_json(data)
             except asyncio.TimeoutError:
-                # No new message, continue with previous params
-                pass
+                data = query_flights(filters, page_size=page_size, cursor=cursor)
+                await websocket.send_json(data)
+
     except WebSocketDisconnect:
         logger.info(f"WebSocket {websocket.client.host}:{websocket.client.port} disconnected")

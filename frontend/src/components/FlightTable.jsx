@@ -129,7 +129,7 @@ export default function FlightTable() {
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
-
+            
             if (data.error) {
                 console.error("Server error:", data.error);
                 setLoading(false);
