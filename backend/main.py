@@ -8,18 +8,21 @@ from app.scheduler.jobs import start_scheduler, stop_scheduler
 from app.routes.flights import router as flights_router
 from app.db.repository import init_db, query_flights
 from app.core.logger import logger
-from app.core.config import SCHEDULER_FETCH_INTERVAL_SECONDS
+from app.core.config import USE_MOCK_DB, SCHEDULER_FETCH_INTERVAL_SECONDS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
     init_db()
-    start_scheduler()
+
+    if not USE_MOCK_DB:
+        start_scheduler()
 
     yield
 
     # Shutdown logic
-    stop_scheduler()
+    if not USE_MOCK_DB:
+        stop_scheduler()
 
 app = FastAPI(lifespan=lifespan, title="OpenSky DB API")
 

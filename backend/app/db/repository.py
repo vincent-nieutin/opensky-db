@@ -1,9 +1,11 @@
 import sqlite3, time, os
-from app.core.config import DB_PATH, DB_RECORD_EXPIRY_SECONDS
+from app.core.config import USE_MOCK_DB, DB_PATH, MOCK_DB_PATH, DB_RECORD_EXPIRY_SECONDS
 from app.core.logger import logger
 
 def get_db():
-    return sqlite3.connect(DB_PATH)
+    db_path = MOCK_DB_PATH if USE_MOCK_DB else DB_PATH
+
+    return sqlite3.connect(db_path)
 
 def init_db():
     conn = get_db()

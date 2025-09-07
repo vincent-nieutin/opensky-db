@@ -13,7 +13,9 @@ OPENSKY_TOKEN_URL = os.getenv("OPENSKY_TOKEN_URL")
 OPENSKY_TOKEN_EXPIRY_SECONDS = os.getenv("OPENSKY_TOKEN_EXPIRY_SECONDS", 1800)
 
 # Database
+USE_MOCK_DB = os.getenv("USE_MOCK_DB", "False") in ("True")
 DB_PATH = os.getenv("DB_PATH", "db/flight_data.db")
+MOCK_DB_PATH = os.getenv("MOCK_DB_PATH", "db/mock_flight_data.db")
 DB_RECORD_EXPIRY_SECONDS = os.getenv("DB_RECORD_EXPIRY_SECONDS", 10)
 
 # Scheduler
