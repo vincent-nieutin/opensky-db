@@ -1,19 +1,20 @@
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { Switch, FormControlLabel } from "@mui/material";
+import { useLocalStorage } from "../hooks/useLocalStorage";
 
 export default function FlightTable() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(0);
+    const [page, setPage] = useLocalStorage("page", 0);
     const [rowCount, setRowCount] = useState(0);
     const [cursorMap, setCursorMap] = useState({ 0: null });
     const [lastCursorSent, setLastCursorSent] = useState(null);
-    const [filters, setFilters] = useState({});
-    const [pageSize, setPageSize] = useState(25);
-    const [sortModel, setSortModel] = useState([]);
+    const [filters, setFilters] = useLocalStorage("filters", {});
+    const [pageSize, setPageSize] = useLocalStorage("pageSize", 25);
+    const [sortModel, setSortModel] = useLocalStorage("sortModel", []);
 
-    const [unitSystem, setUnitSystem] = useState("imperial");
+    const [unitSystem, setUnitSystem] = useLocalStorage("unitSystem", "imperial");
     const metersToFeet = (m) => m * 3.28084;
     const metersPerSecondToKnots = (mps) => mps * 1.94384;
 
@@ -41,7 +42,7 @@ export default function FlightTable() {
             headerName: "On Ground",
             flex: 1,
             valueFormatter: (value) =>
-                value == 1 ? "Yes" : value === 0 ? "No" : "-"
+                value === 1 ? "Yes" : value === 0 ? "No" : "-"
         },
         {
             field: "velocity",
@@ -85,12 +86,35 @@ export default function FlightTable() {
             field: "vertical_rate",
             headerName: "Vertical Rate",
             flex: 1,
-            valueFormatter: (value) => {
-                if (value == null) return "-";
-                return unitSystem === "imperial"
-                    ? `${metersPerSecondToKnots(value).toFixed(2)} ft/s`
-                    : `${value.toFixed(2)} m/s`
-            }
+            renderCell: (params) => {
+                let value = params.value;
+                if (value === null) value = 0;
+
+                const arrowStyle = {
+                    display: "inline-block",
+                    fontSize: "23px"
+                };
+
+                return (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-evenly" }}>
+                        <span style={arrowStyle}>
+                            {
+                                value < 0
+                                    ? "˅"
+                                    : value > 0
+                                    ? "˄"
+                                    : " "
+                            }
+                            
+                        </span>
+                        {
+                            unitSystem === "imperial"
+                                ? `${Math.abs(metersPerSecondToKnots(value).toFixed(1))} ft/s`
+                                : `${value.toFixed(1)} m/s`
+                        }
+                    </div>
+                )
+            },
         },
         // {
         //     field: "geo_altitude",
@@ -130,7 +154,7 @@ export default function FlightTable() {
 
         socket.onopen = () => {
             console.log("WebSocket connection established");
-            sendPageRequest(0);
+            sendPageRequest(null);
         };
 
         socket.onmessage = (event) => {
@@ -188,12 +212,11 @@ export default function FlightTable() {
         sendPageRequest(cursor, newPageSize);
     };
 
-
-    const handleSortChange = (model) => {
-        setSortModel(model);
+    const handleSortChange = (newModel) => {
+        setSortModel(newModel);
         setCursorMap({ 0: null });
         setPage(0);
-        sendPageRequest(null, pageSize, model)
+        sendPageRequest(null, pageSize, newModel)
     };
 
     return (
@@ -203,6 +226,7 @@ export default function FlightTable() {
                     <input
                         type="text"
                         placeholder="Search ICAO24"
+                        value={filters.icao24 || ""}
                         onChange={(e) => {
                             const value = e.target.value;
                             setFilters((prev) => ({
@@ -217,6 +241,7 @@ export default function FlightTable() {
                     <input
                         type="text"
                         placeholder="Search callsign"
+                        value={filters.callsign || ""}
                         onChange={(e) => {
                             const value = e.target.value;
                             setFilters((prev) => ({
@@ -231,6 +256,7 @@ export default function FlightTable() {
                     <input
                         type="text"
                         placeholder="Search Country"
+                        value={filters.origin_country || ""}
                         onChange={(e) => {
                             const value = e.target.value;
                             setFilters((prev) => ({
@@ -245,6 +271,13 @@ export default function FlightTable() {
                     <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         On Ground:
                         <select
+                            value={
+                                filters.on_ground === 1
+                                    ? "yes"
+                                    : filters.on_ground === 0
+                                        ? "no"
+                                        : "any"
+                            }
                             onChange={(e) => {
                                 const value = e.target.value;
                                 setFilters((prev) => ({
@@ -261,7 +294,6 @@ export default function FlightTable() {
                                 border: "1px solid #ccc",
                                 backgroundColor: "#fff"
                             }}
-                            defaultValue="any"
                         >
                             <option value="any">Any</option>
                             <option value="yes">Yes</option>
@@ -271,6 +303,7 @@ export default function FlightTable() {
                     <FormControlLabel
                         control={
                             <Switch
+                                checked={Array.isArray(filters.squawk)}
                                 onChange={(e) => {
                                     const checked = e.target.checked;
                                     setFilters((prev) => ({
@@ -308,6 +341,7 @@ export default function FlightTable() {
                     columns={columns}
                     getRowId={(row) => row.id}
                     loading={loading}
+                    sortModel={sortModel}
                     sortingMode="server"
                     onSortModelChange={handleSortChange}
                     pagination
@@ -321,7 +355,7 @@ export default function FlightTable() {
                         pagination: {
                             paginationModel: {
                                 pageSize: pageSize,
-                                page: 0
+                                page: page
                             }
                         }
                     }}
