@@ -122,12 +122,12 @@ export default function FlightTable() {
             flex: 1,
             renderCell: ({ value: raw }) => {
                 const value = raw == null ? 0 : raw;
-                const arrow = value < 0 ? "˅" : value > 0 ? "˄" : " ";
+                // const arrow = value < 0 ? "˅" : value > 0 ? "˄" : " ";
                 return (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-evenly" }}>
-                        <span style={{ fontSize: 23 }}>{arrow}</span>
+                        {/* <span style={{ fontSize: 23 }}>{arrow}</span> */}
                         {unitSystem === "imperial"
-                            ? `${Math.abs(metersPerSecondToKnots(value).toFixed(1))} ft/s`
+                            ? `${metersPerSecondToKnots(value).toFixed(1)} ft/s`
                             : `${value.toFixed(1)} m/s`}
                     </div>
                 );
