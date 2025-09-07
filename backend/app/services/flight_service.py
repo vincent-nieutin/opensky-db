@@ -1,22 +1,37 @@
+from typing import Any, List
+
+from app.integrations.opensky import fetch_flight_data
+from app.db.repository import upsert_flight_data, remove_expired_flights
 from app.core.logger import logger
 
-def fetch_and_store_flights():
+def fetch_and_store_flights() -> None:
+    """
+    Fetch the latest flight states from OpenSky and upsert them into the DB.
+    Logs inserted vs. updated counts, or warns if no data arrives.
+    """
     try:
-        from app.integrations.opensky import fetch_flight_data
-        flight_data = fetch_flight_data()
-        if flight_data:
-            from app.db.repository import upsert_flight_data
-            inserted, updated = upsert_flight_data(flight_data)
-            logger.info(f"Successfully inserted {inserted} new records, updated {updated} existing records")
-        else:
-            logger.warning("No flight data received")
-    except Exception as e:
-        logger.error(f"Failed to fetch or store flights: {e}")
+        states: List[Any] = fetch_flight_data()
+        if not states:
+            logger.warning("No flight data received from OpenSky")
+            return
 
-def cleanup_flights():
+        inserted, updated = upsert_flight_data(states)
+        logger.info(
+            "Flight data upsert complete: %d inserted, %d updated",
+            inserted,
+            updated
+        )
+    except Exception:
+        logger.exception("Failed to fetch and store flight data")
+
+
+def cleanup_flights() -> None:
+    """
+    Delete expired flight records from the DB.
+    Logs how many rows were removed.
+    """
     try:
-        from app.db.repository import remove_expired_flights
-        remove_expired_flights()
-    except Exception as e:
-        logger.error(f"Failed to clean up flights: {e}")
-
+        deleted = remove_expired_flights()
+        logger.info("Expired flight cleanup complete: %d records removed", deleted)
+    except Exception:
+        logger.exception("Failed to clean up expired flight records")

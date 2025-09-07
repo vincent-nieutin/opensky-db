@@ -1,52 +1,84 @@
-from app.core.config import OPENSKY_CLIENT_ID, OPENSKY_CLIENT_SECRET, OPENSKY_TOKEN_URL, OPENSKY_TOKEN_EXPIRY_SECONDS, OPENSKY_API_URL
-import os, time, requests
+import time
+from typing import List, Any
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+from app.core.config import (
+    OPENSKY_CLIENT_ID,
+    OPENSKY_CLIENT_SECRET,
+    OPENSKY_TOKEN_URL,
+    OPENSKY_TOKEN_EXPIRY_SECONDS,
+    OPENSKY_API_URL
+)
 from app.core.logger import logger
 
-# Globals to store token and expiry
+# ─── Module-Level Session with Retries
+
+_session = requests.Session()
+_retry_strategy = Retry(
+    total=3,
+    backoff_factor=0.3,
+    status_forcelist=[500, 502, 503, 504],
+    allowed_methods=["POST", "GET"],
+)
+_adapter = HTTPAdapter(max_retries=_retry_strategy)
+_session.mount("https://", _adapter)
+_session.mount("http://", _adapter)
+
+# ─── Token Cache
+
 _token_cache = {
     "access_token": None,
     "expires_at": 0  # Unix timestamp
 }
 
-def get_opensky_token():
+def _is_token_valid() -> bool:
+    return (
+        _token_cache["access_token"] is not None
+        and time.time() < _token_cache["expires_at"] - 60
+    )
+
+def get_opensky_token() -> str:
     now = time.time()
 
-    # Check if token is still valid (with 1-minute buffer)
-    if _token_cache["access_token"] and now < _token_cache["expires_at"] - 60:
+    if _is_token_valid():
         return _token_cache["access_token"]
 
-    # Fetch new token
     payload = {
         "client_id": OPENSKY_CLIENT_ID,
         "client_secret": OPENSKY_CLIENT_SECRET,
         "grant_type": "client_credentials"
     }
 
-    response = requests.post(OPENSKY_TOKEN_URL, data=payload)
-    if response.status_code == 200:
-        token_data = response.json()
-        access_token = token_data.get("access_token")
-        expires_in = token_data.get("expires_in", OPENSKY_TOKEN_EXPIRY_SECONDS)
+    logger.debug("Requesting new OpenSky token")
+    response = _session.post(OPENSKY_TOKEN_URL, data=payload, timeout=10)
+    response.raise_for_status()
 
-        # Cache token and expiry time
-        _token_cache["access_token"] = access_token
-        _token_cache["expires_at"] = now + expires_in
+    data = response.json()
+    token = data.get("access_token")
+    if not token:
+        raise RuntimeError("No access_token in OpenSky response")
 
-        return access_token
-    else:
-        raise Exception(f"Token request failed: {response.status_code} {response.text}")
+    expires_in = data.get("expires_in", OPENSKY_TOKEN_EXPIRY_SECONDS)
+    _token_cache.update({
+        "access_token": token,
+        "expires_at": time.time() + float(expires_in),
+    })
+
+    logger.info("Obtained new OpenSky token, expires in %s seconds", expires_in)
+    return token
 
 
-def fetch_flight_data():
+def fetch_flight_data() -> List[Any]:
     token = get_opensky_token()
     headers = { "Authorization": f"Bearer {token}" }
-    url = OPENSKY_API_URL
 
     logger.info("Fetching flight data from Opensky API")
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        states = response.json().get("states", [])
-        logger.info(f"Fetched {len(states)} states")
-        return states
-    else:
-        raise Exception(f"Opensky data request failed: {response.status_code} {response.text}")
+    response = _session.get(OPENSKY_API_URL, headers=headers, timeout=10)
+    response.raise_for_status()
+
+    payload = response.json()
+    states = payload.get("states", [])
+    logger.info("Fetched %d flight states", len(states))
+    return states

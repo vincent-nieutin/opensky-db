@@ -13,6 +13,8 @@ OPENSKY_TOKEN_URL = os.getenv("OPENSKY_TOKEN_URL")
 OPENSKY_TOKEN_EXPIRY_SECONDS = os.getenv("OPENSKY_TOKEN_EXPIRY_SECONDS", 1800)
 OPENSKY_API_URL = os.getenv("OPENSKY_API_URL")
 
+CORS_ORIGINS = os.getenv("CORS_ORIGINS")
+
 # Database
 USE_MOCK_DB = os.getenv("USE_MOCK_DB", "False") in ("True")
 DB_PATH = os.getenv("DB_PATH", "db/flight_data.db")
