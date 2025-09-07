@@ -1,4 +1,4 @@
-from app.core.config import OPENSKY_CLIENT_ID, OPENSKY_CLIENT_SECRET, OPENSKY_TOKEN_URL, OPENSKY_TOKEN_EXPIRY_SECONDS
+from app.core.config import OPENSKY_CLIENT_ID, OPENSKY_CLIENT_SECRET, OPENSKY_TOKEN_URL, OPENSKY_TOKEN_EXPIRY_SECONDS, OPENSKY_API_URL
 import os, time, requests
 from app.core.logger import logger
 
@@ -40,7 +40,7 @@ def get_opensky_token():
 def fetch_flight_data():
     token = get_opensky_token()
     headers = { "Authorization": f"Bearer {token}" }
-    url = "https://opensky-network.org/api/states/all?extended=1"
+    url = OPENSKY_API_URL
 
     logger.info("Fetching flight data from Opensky API")
     response = requests.get(url, headers=headers)
