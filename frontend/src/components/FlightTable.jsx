@@ -10,7 +10,7 @@ export default function FlightTable() {
     const [cursorMap, setCursorMap] = useState({ 0: null });
     const [lastCursorSent, setLastCursorSent] = useState(null);
     const [filters, setFilters] = useState({});
-    const [pageSize, setPageSize] = useState(50);
+    const [pageSize, setPageSize] = useState(25);
     const [sortModel, setSortModel] = useState([]);
 
     const [unitSystem, setUnitSystem] = useState("imperial");

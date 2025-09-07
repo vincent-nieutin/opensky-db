@@ -41,6 +41,8 @@ async def websocket_endpoint(websocket: WebSocket):
     filters = {}
     page_size = 50
     cursor = None
+    sort_field = None
+    sort_order = None
     
     try:
         while True:
