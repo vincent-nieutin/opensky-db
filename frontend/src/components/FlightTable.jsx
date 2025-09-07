@@ -1,29 +1,69 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { Switch, FormControlLabel } from "@mui/material";
 import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { useWebSocketRequest } from "../hooks/useWebSocketRequest";
+
+// ─── Constants & Helpers 
+
+const API_WS_URL = "ws://localhost:8000/ws";
+
+const metersToFeet = (m) => m * 3.28084;
+const metersPerSecondToKnots = (mps) => mps * 1.94384;
+
+const containerStyle = { marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" };
+const filterGroupStyle = { display: "flex", gap: "12px", alignItems: "center" }
+
+// ─── Component
 
 export default function FlightTable() {
+    // Core state
     const [rows, setRows] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [page, setPage] = useLocalStorage("page", 0);
     const [rowCount, setRowCount] = useState(0);
+    const [loading, setLoading] = useState(true);
     const [cursorMap, setCursorMap] = useState({ 0: null });
     const [lastCursorSent, setLastCursorSent] = useState(null);
-    const [filters, setFilters] = useLocalStorage("filters", {});
+
+    // Persisted state
+    const [page, setPage] = useLocalStorage("page", 0);
     const [pageSize, setPageSize] = useLocalStorage("pageSize", 25);
     const [sortModel, setSortModel] = useLocalStorage("sortModel", []);
-
+    const [filters, setFilters] = useLocalStorage("filters", {});
     const [unitSystem, setUnitSystem] = useLocalStorage("unitSystem", "imperial");
-    const metersToFeet = (m) => m * 3.28084;
-    const metersPerSecondToKnots = (mps) => mps * 1.94384;
 
-    const columns = [
+    // Debounced inputs
+    const [rawFilters, setRawFilters] = useState(filters);
+    const debouncedFilters = useDebouncedValue(rawFilters, 300);
+
+    // ─── WebSocket hook
+
+    const handleServerMessage = useCallback(data => {
+        if (data.error) {
+            console.error("Server error:", data.error);
+            setLoading(false);
+            return;
+        }
+
+        setRows(data.results);
+        setRowCount(data.results_count);
+        setLoading(false);
+
+        setCursorMap(prev => ({
+            ...prev,
+            [Object.keys(prev).length]: data.next_cursor,
+        }));
+        setLastCursorSent(data.next_cursor);
+    }, []);
+
+    const { sendRequest, isReady } = useWebSocketRequest(API_WS_URL, handleServerMessage);
+
+    // ─── Memoized columns
+
+    const columns = useMemo(() => [
         { field: "icao24", "headerName": "ICAO24", flex: 1 },
         { field: "callsign", headerName: "Callsign", flex: 1 },
         { field: "origin_country", headerName: "Country", flex: 1 },
-        // { field: "time_position", headerName: "Time Position", flex: 1 },
-        // { field: "last_contact", headerName: "Last Contact", flex: 1 },
         { field: "longitude", headerName: "Longitude", flex: 1 },
         { field: "latitude", headerName: "Latitude", flex: 1 },
         {
@@ -59,287 +99,190 @@ export default function FlightTable() {
             field: "true_track",
             headerName: "True Track",
             flex: 1,
-            renderCell: (params) => {
-                const value = params.value;
-                if (value === null) return "-";
-
+            renderCell: ({ value }) => {
+                if (value == null) return "-";
                 const angle = Math.round(value);
                 const arrowStyle = {
                     display: "inline-block",
                     transform: `rotate(${angle}deg)`,
-                    transition: "transfrom 0.2 ease",
-                    marginRight: "15px",
-                    fontSize: "25px"
+                    marginRight: 15,
+                    fontSize: 25
                 };
-
                 return (
                     <div style={{ display: "flex", alignItems: "center" }}>
                         <span style={arrowStyle}>↑</span>
-                        {`${angle.toLocaleString()}°`}
+                        {angle.toLocaleString()}°
                     </div>
-                )
+                );
             }
-            // valueFormatter: (value) =>
-            //     value != null ? `${value.toFixed(0)}°` : "—"
         },
         {
             field: "vertical_rate",
             headerName: "Vertical Rate",
             flex: 1,
-            renderCell: (params) => {
-                let value = params.value;
-                if (value === null) value = 0;
-
-                const arrowStyle = {
-                    display: "inline-block",
-                    fontSize: "23px"
-                };
-
+            renderCell: ({ value: raw }) => {
+                const value = raw == null ? 0 : raw;
+                const arrow = value < 0 ? "˅" : value > 0 ? "˄" : " ";
                 return (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-evenly" }}>
-                        <span style={arrowStyle}>
-                            {
-                                value < 0
-                                    ? "˅"
-                                    : value > 0
-                                    ? "˄"
-                                    : " "
-                            }
-                            
-                        </span>
-                        {
-                            unitSystem === "imperial"
-                                ? `${Math.abs(metersPerSecondToKnots(value).toFixed(1))} ft/s`
-                                : `${value.toFixed(1)} m/s`
-                        }
+                        <span style={{ fontSize: 23 }}>{arrow}</span>
+                        {unitSystem === "imperial"
+                            ? `${Math.abs(metersPerSecondToKnots(value).toFixed(1))} ft/s`
+                            : `${value.toFixed(1)} m/s`}
                     </div>
-                )
-            },
+                );
+            }
         },
-        // {
-        //     field: "geo_altitude",
-        //     headerName: "Geo Altitude",
-        //     flex: 1,
-        //     valueFormatter: (value) =>
-        //         value != null ? `${value.toFixed(0)} m` : "—"
-        // },
         { field: "squawk", headerName: "Squawk", flex: 1 },
-        // { field: "position_source", headerName: "Position Source", flex: 1 },
-        // { field: "category", headerName: "Category", flex: 1 }
-    ];
+    ], [unitSystem]);
 
-    const socketRef = useRef(null);
+    // ─── sendPageRequest Callback
 
-    const sendPageRequest = (cursor, size = pageSize, model = sortModel) => {
-        const sort = model[0] || {};
-
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(
-                JSON.stringify({
-                    filters: filters,
-                    page_size: size,
-                    cursor: cursor,
-                    sort_field: sort.field,
-                    sort_order: sort.sort
-                })
-            );
+    const sendPageRequest = useCallback(
+        (cursor = null) => {
+            const { field, sort } = sortModel[0] || {};
             setLoading(true);
+            sendRequest({
+                filters,
+                page_size: pageSize,
+                cursor,
+                sort_field: field,
+                sort_order: sort
+            });
             setLastCursorSent(cursor);
-        }
-    };
+        },
+        [filters, pageSize, sortModel, sendRequest]
+    );
 
+    // ─── Effects
+
+    // 1) On first WS‐ready, fire initial request
     useEffect(() => {
-        const socket = new WebSocket("ws://localhost:8000/ws");
-        socketRef.current = socket;
-
-        socket.onopen = () => {
-            console.log("WebSocket connection established");
+        if (isReady) {
             sendPageRequest(null);
         };
+    }, [isReady, sendPageRequest]);
 
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-
-            if (data.error) {
-                console.error("Server error:", data.error);
-                setLoading(false);
-                return;
-            }
-
-            setRows(data.results);
-            setRowCount(data.results_count);
-            setLoading(false);
-
-            setCursorMap((prev) => {
-                const nextPage = Object.keys(prev).length;
-                return {
-                    ...prev,
-                    [nextPage]: data.next_cursor,
-                };
-            });
-            setLastCursorSent(data.next_cursor);
-        };
-
-        socket.onerror = (error) => {
-            console.error("WebSocket error:", error);
-        };
-
-        socket.onclose = () => {
-            console.log("WebSocket connection closed");
-        };
-
-        return () => {
-            if (
-                socket.readyState === WebSocket.OPEN ||
-                socket.readyState === WebSocket.CONNECTING
-            ) {
-                socket.close(1000, "Component unmounted");
-            }
-        };
-    }, []);
-
+    // 2) When debounced filters change, reset pagination + request
     useEffect(() => {
-        sendPageRequest(null); // restart from beginning with new filters
-    }, [filters]);
+        if (!isReady) return
 
-    const handlePageChange = (model) => {
-        const newPage = model.page;
-        const newPageSize = model.pageSize;
-
-        setPageSize(newPageSize);
-        const cursor = cursorMap[newPage] ?? lastCursorSent ?? null;
-        setPage(newPage);
-        sendPageRequest(cursor, newPageSize);
-    };
-
-    const handleSortChange = (newModel) => {
-        setSortModel(newModel);
         setCursorMap({ 0: null });
         setPage(0);
-        sendPageRequest(null, pageSize, newModel)
-    };
+        setFilters(debouncedFilters);
+        sendPageRequest(null)
+    }, [debouncedFilters, isReady, setFilters, setPage, sendPageRequest]);
+
+    // ─── Handlers
+
+    const handlePageChange = useCallback(
+        ({ page: newPage, pageSize: newPageSize }) => {
+            setPage(newPage);
+            setPageSize(newPageSize);
+            const cursor = cursorMap[newPage] ?? lastCursorSent;
+            sendPageRequest(cursor);
+        },
+        [cursorMap, lastCursorSent, sendPageRequest, setPage, setPageSize]
+    );
+
+    const handleSortChange = useCallback(
+        (newModel) => {
+            setSortModel(newModel);
+            setPage(0);
+            setCursorMap({ 0: null });
+            sendPageRequest(null);
+        },
+        [sendPageRequest, setSortModel, setPage, setCursorMap]
+    );
+
+    // ─── Render
 
     return (
         <div>
-            <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <div style={containerStyle}>
+                <div style={filterGroupStyle}>
                     <input
                         type="text"
                         placeholder="Search ICAO24"
-                        value={filters.icao24 || ""}
-                        onChange={(e) => {
-                            const value = e.target.value;
-                            setFilters((prev) => ({
-                                ...prev,
-                                icao24: value || undefined,
-                            }));
-                            setCursorMap({ 0: null });
-                            setPage(0);
-                        }}
+                        value={rawFilters.icao24 || ""}
+                        onChange={e => setRawFilters((prev) => ({ ...prev, icao24: e.target.value || undefined }))}
                         style={{ padding: 8, width: 200 }}
                     />
                     <input
                         type="text"
                         placeholder="Search callsign"
-                        value={filters.callsign || ""}
-                        onChange={(e) => {
-                            const value = e.target.value;
-                            setFilters((prev) => ({
-                                ...prev,
-                                callsign: value || undefined,
-                            }));
-                            setCursorMap({ 0: null });
-                            setPage(0);
-                        }}
+                        value={rawFilters.callsign || ""}
+                        onChange={e => setRawFilters(prev => ({ ...prev, callsign: e.target.value || undefined }))}
                         style={{ padding: 8, width: 200 }}
                     />
                     <input
                         type="text"
                         placeholder="Search Country"
-                        value={filters.origin_country || ""}
-                        onChange={(e) => {
-                            const value = e.target.value;
-                            setFilters((prev) => ({
-                                ...prev,
-                                origin_country: value || undefined,
-                            }));
-                            setCursorMap({ 0: null });
-                            setPage(0);
-                        }}
+                        value={rawFilters.origin_country || ""}
+                        onChange={e => setRawFilters(prev => ({ ...prev, origin_country: e.target.value || undefined }))}
                         style={{ padding: 8, width: 200 }}
                     />
-                    <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         On Ground:
                         <select
                             value={
-                                filters.on_ground === 1
+                                rawFilters.on_ground === 1
                                     ? "yes"
-                                    : filters.on_ground === 0
+                                    : rawFilters.on_ground === 0
                                         ? "no"
                                         : "any"
                             }
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setFilters((prev) => ({
+                            onChange={e =>
+                                setRawFilters(prev => ({
                                     ...prev,
                                     on_ground:
-                                        value === "any" ? undefined : value === "yes" ? 1 : 0
-                                }));
-                                setCursorMap({ 0: null });
-                                setPage(0);
-                            }}
-                            style={{
-                                padding: "8px",
-                                borderRadius: "4px",
-                                border: "1px solid #ccc",
-                                backgroundColor: "#fff"
-                            }}
+                                        e.target.value === "any"
+                                            ? undefined
+                                            : e.target.value === "yes"
+                                                ? 1
+                                                : 0
+                                }))
+                            }
+                            style={{ padding: "8px", borderRadius: "4px", border: "1px solid #ccc", backgroundColor: "#fff" }}
                         >
                             <option value="any">Any</option>
                             <option value="yes">Yes</option>
                             <option value="no">No</option>
                         </select>
                     </label>
+
                     <FormControlLabel
                         control={
                             <Switch
-                                checked={Array.isArray(filters.squawk)}
-                                onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    setFilters((prev) => ({
+                                checked={Array.isArray(rawFilters.squawk)}
+                                onChange={e =>
+                                    setRawFilters(prev => ({
                                         ...prev,
-                                        squawk: checked ? ["7500", "7600", "7700"] : undefined,
-                                    }));
-                                    setCursorMap({ 0: null });
-                                    setPage(0);
-                                }}
+                                        squawk: e.target.checked ? ["7500", "7600", "7700"] : undefined
+                                    }))
+                                }
                             />
                         }
                         label="Emergencies"
                     />
                 </div>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span>Metric</span>
                     <Switch
                         checked={unitSystem === "imperial"}
-                        onChange={(e) => {
-                            setUnitSystem(e.target.checked ? "imperial" : "metric"); // new state
-                        }}
+                        onChange={e => setUnitSystem(e.target.checked ? "imperial" : "metric")}
                     />
                     <span>Imperial</span>
                 </label>
             </div>
+
             <div style={{ height: "calc(100vh - 94px)", width: "100%" }}>
                 <DataGrid
-                    sx={{
-                        "& .MuiDataGrid-row:hover": {
-                            backgroundColor: "#f0f8ff",
-                            cursor: "pointer"
-                        }
-                    }}
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.id}
+                    getRowId={r => r.id}
                     loading={loading}
                     sortModel={sortModel}
                     sortingMode="server"
@@ -352,18 +295,17 @@ export default function FlightTable() {
                     pageSizeOptions={[5, 10, 25, 50, 100]}
                     page={page}
                     initialState={{
-                        pagination: {
-                            paginationModel: {
-                                pageSize: pageSize,
-                                page: page
-                            }
+                        pagination: { paginationModel: { pageSize: pageSize, page: page } }
+                    }}
+                    sx={{
+                        "& .MuiDataGrid-row:hover": {
+                            backgroundColor: "#f0f8ff",
+                            cursor: "pointer"
                         }
                     }}
-                    onRowClick={(params) => {
+                    onRowClick={params => {
                         const icao = params.row.icao24;
-                        if (icao) {
-                            window.open(`https://globe.adsbexchange.com/?icao=${icao}`, "_blank");
-                        }
+                        if (icao) window.open(`https://globe.adsbexchange.com/?icao=${icao}`, "_blank");
                     }}
                 />
             </div>
