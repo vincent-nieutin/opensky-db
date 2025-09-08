@@ -1,7 +1,7 @@
 # ───────────────────────────────────────────────────────────────────────────
 # Stage 1: Build React frontend
 # ───────────────────────────────────────────────────────────────────────────
-FROM node:16-alpine AS frontend-builder
+FROM node:23.11.0-alpine AS frontend-builder
 
 WORKDIR /opensky-db/frontend
 COPY frontend/package.json frontend/package-lock.json ./
@@ -34,4 +34,4 @@ RUN mkdir -p client/build
 COPY --from=frontend-builder /opensky-db/frontend/build client/build
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
