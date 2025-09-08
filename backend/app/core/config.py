@@ -6,6 +6,8 @@ from pathlib import Path
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
+ENVIRONMENT = os.getenv("ENVIRONMENT")
+
 # OpenSky API credentials
 OPENSKY_CLIENT_ID = os.getenv("OPENSKY_CLIENT_ID")
 OPENSKY_CLIENT_SECRET = os.getenv("OPENSKY_CLIENT_SECRET")
@@ -13,13 +15,13 @@ OPENSKY_TOKEN_URL = os.getenv("OPENSKY_TOKEN_URL")
 OPENSKY_TOKEN_EXPIRY_SECONDS = os.getenv("OPENSKY_TOKEN_EXPIRY_SECONDS", 1800)
 OPENSKY_API_URL = os.getenv("OPENSKY_API_URL")
 
-CORS_ORIGINS = os.getenv("CORS_ORIGINS")
+ALLOW_ORIGINS = os.getenv("ALLOW_ORIGINS", "").split(",")
 
 # Database
 USE_MOCK_DB = os.getenv("USE_MOCK_DB", "False") in ("True")
-DB_PATH = os.getenv("DB_PATH", "db/flight_data.db")
-MOCK_DB_PATH = os.getenv("MOCK_DB_PATH", "db/mock_flight_data.db")
-DB_RECORD_EXPIRY_SECONDS = os.getenv("DB_RECORD_EXPIRY_SECONDS", 10)
+DB_PATH = os.getenv("DB_PATH", "db/states.db")
+MOCK_DB_PATH = os.getenv("MOCK_DB_PATH", "db/mock_states.db")
+DB_RECORD_EXPIRY_SECONDS = int(os.getenv("DB_RECORD_EXPIRY_SECONDS", 10))
 
 # Scheduler
 SCHEDULER_FETCH_INTERVAL_SECONDS = int(os.getenv("SCHEDULER_FETCH_INTERVAL_SECONDS", 25))

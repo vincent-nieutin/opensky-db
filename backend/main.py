@@ -1,21 +1,34 @@
 import json
 import asyncio
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+import sqlite3
 
+from app.db.session import get_db
 from app.scheduler.jobs import start_scheduler, stop_scheduler
-from app.db.repository import init_db, query_flights
+from app.db.repository import (
+    init_db,
+    query_states
+)
 from app.core.logger import logger
-from app.core.config import USE_MOCK_DB, SCHEDULER_FETCH_INTERVAL_SECONDS, CORS_ORIGINS
+from app.core.config import (
+    USE_MOCK_DB,
+    SCHEDULER_FETCH_INTERVAL_SECONDS,
+    ALLOW_ORIGINS,
+    ENVIRONMENT
+)
 
 # ─── Constants
 
 DEFAULT_PAGE_SIZE = 50
-DEFAULT_FILTERS = {}
-DEFAULT_SORT = {"field": None, "order": None}
+DEFAULT_FILTERS: Dict[str, Any] = {}
+DEFAULT_SORT_FIELD: Optional[str] = None
+DEFAULT_SORT_ORDER: Optional[str] = None
 
 # ─── Lifespan (startup / shutdown)
 
@@ -34,7 +47,7 @@ app = FastAPI(title="OpenSky DB API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOW_ORIGINS or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,6 +57,7 @@ app.add_middleware(
 
 async def _send_flights(
     ws: WebSocket,
+    conn: sqlite3.Connection,
     filters: Dict[str, Any],
     page_size: int,
     cursor: Any,
@@ -51,7 +65,8 @@ async def _send_flights(
     sort_order: Any
 ):
     try:
-        payload = query_flights(
+        payload = query_states(
+            conn=conn,
             filters=filters,
             page_size=page_size,
             cursor=cursor,
@@ -61,13 +76,19 @@ async def _send_flights(
         await ws.send_json(payload)
     except Exception as e:
         logger.error("Failed to query/send flights: %s", e)
-        # Optionally notify client of error
+        # Notify client of error
         await ws.send_json({"error": "internal_server_error"})
 
 # ─── WebSocket Endpoint
 
+api = APIRouter(prefix="/api")
+app.include_router(api)
+
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    conn: sqlite3.Connection = Depends(get_db),
+):
     await websocket.accept()
     client = f"{websocket.client.host}:{websocket.client.port}"
     logger.info("WebSocket connected: %s", client)
@@ -75,7 +96,8 @@ async def websocket_endpoint(websocket: WebSocket):
     filters = DEFAULT_FILTERS.copy()
     page_size = DEFAULT_PAGE_SIZE
     cursor = None
-    sort = DEFAULT_SORT
+    sort_field = DEFAULT_SORT_FIELD
+    sort_order = DEFAULT_SORT_ORDER
     
     try:
         while True:
@@ -89,21 +111,20 @@ async def websocket_endpoint(websocket: WebSocket):
                 filters = params.get("filters", filters)
                 page_size = params.get("page_size", page_size)
                 cursor = params.get("cursor", cursor)
-                sort = {
-                    "field": params.get("sort_field", sort["field"]),
-                    "order": params.get("sort_order", sort["order"]),
-                }
+                sort_field = params.get("sort_field", sort_field)
+                sort_order = params.get("sort_order", sort_order)
 
             except asyncio.TimeoutError:
                 pass
 
             await _send_flights(
                 websocket,
+                conn,
                 filters,
                 page_size,
                 cursor,
-                sort["field"],
-                sort["order"],
+                sort_field,
+                sort_order
             )
 
     except WebSocketDisconnect:
@@ -112,8 +133,27 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.exception("WebSocket %s encountered error: %s", client, e)
         await websocket.close(code=1011)
 
-# ─── Favicon Endpoint
+# ─── Static & SPA Configuration
 
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
-    return FileResponse("static/favicon.ico")
+if ENVIRONMENT == "production":
+    project_root = Path(__file__).parent.resolve()
+    frontend_build = project_root / "client" / "build"
+
+    app.mount(
+        "/static",
+        StaticFiles(directory=frontend_build / "static"),
+        name="static"
+    )
+
+    class SPAStaticFiles(StaticFiles):
+        async def get_response(self, path, scope):
+            response = await super().get_response(path, scope)
+            if response.status_code == 404:
+                return await super().get_response("index.html", scope)
+            return response
+
+    app.mount(
+        "/",
+        SPAStaticFiles(directory=frontend_build, html=True),
+        name="spa"
+    )

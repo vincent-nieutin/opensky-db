@@ -70,7 +70,7 @@ def get_opensky_token() -> str:
     return token
 
 
-def fetch_flight_data() -> List[Any]:
+def fetch_states() -> List[Any]:
     token = get_opensky_token()
     headers = { "Authorization": f"Bearer {token}" }
 

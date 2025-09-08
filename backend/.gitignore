@@ -3,5 +3,6 @@ env/
 
 /db/
 logs/
+client/
 
 .env

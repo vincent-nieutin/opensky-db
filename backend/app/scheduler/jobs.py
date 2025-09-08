@@ -1,7 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.services.flight_service import fetch_and_store_flights, cleanup_flights
+from app.services.flight_service import fetch_and_store_flights, cleanup_states
 from app.core.config import (
     SCHEDULER_FETCH_INTERVAL_SECONDS,
     SCHEDULER_CLEANUP_INTERVAL_MINUTES,
@@ -41,14 +41,14 @@ def _build_scheduler() -> BackgroundScheduler:
     # Cleanup job
     cleanup_interval = int(SCHEDULER_CLEANUP_INTERVAL_MINUTES)
     sched.add_job(
-        cleanup_flights,
+        cleanup_states,
         trigger=IntervalTrigger(minutes=cleanup_interval),
-        id="cleanup_flights",
-        name="Cleanup Expired Flights",
+        id="cleanup_states",
+        name="Cleanup Expired States",
         replace_existing=True,
     )
     logger.info(
-        "Scheduled cleanup_flights every %d minutes",
+        "Scheduled cleanup_states every %d minutes",
         cleanup_interval,
     )
 
