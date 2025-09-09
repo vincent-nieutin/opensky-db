@@ -7,7 +7,8 @@ import { useWebSocketRequest } from "../hooks/useWebSocketRequest";
 
 // ─── Constants & Helpers 
 
-const API_WS_URL = "ws://localhost:8000/ws";
+const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+const API_WS_URL = `${protocol}://${window.location.host}/ws`;
 
 const metersToFeet = (m) => m * 3.28084;
 const metersPerSecondToKnots = (mps) => mps * 1.94384;
