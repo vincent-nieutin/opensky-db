@@ -33,5 +33,5 @@ COPY backend/ .
 RUN mkdir -p client/build
 COPY --from=frontend-builder /opensky-db/frontend/build client/build
 
-EXPOSE 8080
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
