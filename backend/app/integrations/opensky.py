@@ -51,7 +51,7 @@ def get_opensky_token() -> str:
         "grant_type": "client_credentials"
     }
 
-    logger.debug("Requesting new OpenSky token")
+    logger.info("Requesting new OpenSky token")
     response = _session.post(OPENSKY_TOKEN_URL, data=payload, timeout=10)
     response.raise_for_status()
 

@@ -66,7 +66,7 @@ def start_scheduler() -> None:
     """
     global _scheduler
     if _scheduler and _scheduler.running:
-        logger.debug("Scheduler is already running; start_scheduler() skipped.")
+        logger.info("Scheduler is already running; start_scheduler() skipped.")
         return
 
     _scheduler = _build_scheduler()
@@ -84,4 +84,4 @@ def stop_scheduler(wait: bool = False) -> None:
         _scheduler.shutdown(wait=wait)
         logger.info("BackgroundScheduler stopped.")
     else:
-        logger.debug("Scheduler was not running; stop_scheduler() skipped.")
+        logger.info("Scheduler was not running; stop_scheduler() skipped.")
