@@ -55,8 +55,16 @@ def upsert_states(
 ) -> Tuple[int,int]:
     total = len(states)
     cursor = conn.cursor()
+    inserted = 0
+    updated = 0
+
     for state in states:
         values = tuple(state[:12] + state[13:15] + state[16:18])
+        icao24 = state[0]
+
+        cursor.execute("SELECT 1 FROM states WHERE icao24 = ?", (icao24,))
+        exists = cursor.fetchone()
+
         cursor.execute("""
             INSERT INTO states (
                 icao24, callsign, origin_country, time_position, last_contact, longitude, latitude, baro_altitude, on_ground, velocity, true_track, vertical_rate, geo_altitude, squawk, position_source, category
@@ -80,9 +88,15 @@ def upsert_states(
                 position_source = excluded.position_source,
                 category = excluded.category
             """, values)
+
+        if exists:
+            updated += 1
+        else:
+            inserted += 1
+
     conn.commit()
     affected = cursor.rowcount
-    return total, affected
+    return inserted, updated
 
 # ─── Cleanup Expired Records
 
