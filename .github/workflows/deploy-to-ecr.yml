@@ -22,15 +22,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region:            ${{ secrets.AWS_REGION }}
 
-    # - name: Login to Amazon ECR
-    #   run: |
-    #     aws ecr get-login-password \
-    #       --region ${{ secrets.AWS_REGION }} \
-    #     | docker login \
-    #       --username AWS \
-    #       --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-
-    - name: Login to Amazon ECR (action)
+    - name: Login to Amazon ECR
       uses: aws-actions/amazon-ecr-login@v1
       
     - name: Build, Tag, and Push Docker Image
@@ -41,3 +33,11 @@ jobs:
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Force ECS deployment
+      run: |
+        aws ecs update-service \
+          --cluster opensky-cluster \
+          --service opensky-db-service \
+          --force-new-deployment \
+          --region eu-west-3
