@@ -52,7 +52,7 @@ def get_opensky_token() -> str:
     }
 
     logger.info("Requesting new OpenSky token")
-    response = _session.post(OPENSKY_TOKEN_URL, data=payload, timeout=10)
+    response = _session.post(OPENSKY_TOKEN_URL, data=payload, timeout=30)
     response.raise_for_status()
 
     data = response.json()
@@ -66,7 +66,7 @@ def get_opensky_token() -> str:
         "expires_at": time.time() + float(expires_in),
     })
 
-    logger.info("Obtained new OpenSky token, expires in %s seconds", expires_in)
+    logger.info("Obtained new OpenSky token, expires at %s (in %.2f seconds)", _token_cache["expires_at"], _token_cache["expires_at"] - time.time())
     return token
 
 
