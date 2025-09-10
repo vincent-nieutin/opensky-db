@@ -81,9 +81,6 @@ async def _send_flights(
 
 # ─── WebSocket Endpoint
 
-api = APIRouter(prefix="/api")
-app.include_router(api)
-
 @app.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
@@ -132,6 +129,10 @@ async def websocket_endpoint(
     except Exception as e:
         logger.exception("WebSocket %s encountered error: %s", client, e)
         await websocket.close(code=1011)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 
 # ─── Static & SPA Configuration
 
